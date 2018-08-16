@@ -141,6 +141,15 @@ vector<Type> calc_logistic_vul(vector<Type> vul_par, int max_age) {
 	return vul;
 }
 
+// Gaussian-function where f(mu) - f(amax) = 1 - Vmax
+template<class Type>
+Type gaussian_dome(Type x, Type mu, Type sd, Type Vmax, Type amax) {
+  Type ans = 1 - Vmax;
+  ans /= 1 - exp(-0.5 * pow((amax - mu)/sd, 2));
+  ans *= exp(-0.5 * pow((x - mu)/sd, 2));
+  return ans;
+}
+
 template<class Type>
 vector<Type> calc_dome_vul(vector<Type> vul_par, int max_age) {
   vector<Type> vul(max_age);
@@ -148,17 +157,19 @@ vector<Type> calc_dome_vul(vector<Type> vul_par, int max_age) {
   Type vul_mu_asc = vul_par(1);
   Type vul_mu_des = vul_mu_asc + exp(vul_par(2));
   Type vul_sd_des = exp(vul_par(3));
+  Type vul_maxage = invlogit(vul_par(4));
 
   Type denom_asc = dnorm(vul_mu_asc, vul_mu_asc, vul_sd_asc, false);
-  Type denom_des = dnorm(vul_mu_des, vul_mu_des, vul_sd_des, false);
+  Type amax = max_age;
+  Type des_loc = gaussian_dome(vul_mu_des, vul_mu_des, vul_sd_des, vul_maxage, amax);
 
   for(int a=0;a<max_age;a++) {
     Type aa = a;
-	aa += 1;
+    aa += 1;
     Type vul_asc = dnorm(aa, vul_mu_asc, vul_sd_asc, false);
     vul_asc /= denom_asc;
-    Type vul_des = dnorm(aa, vul_mu_des, vul_sd_des, false);
-    vul_des /= denom_des;
+    Type vul_des = gaussian_dome(aa, vul_mu_des, vul_sd_des, vul_maxage, amax);
+    vul_des += 1 - des_loc;
 
     vul(a) = CppAD::CondExpLe(aa, vul_mu_asc, vul_asc, CppAD::CondExpLe(aa, vul_mu_des, Type(1), vul_des));
   }
