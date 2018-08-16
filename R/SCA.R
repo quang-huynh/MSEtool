@@ -125,7 +125,7 @@
 #' @seealso \link{plot,Assessment,ANY-method} \link{summary,Assessment-method} \link{retrospective} \link{profile_likelihood} \link{make_MP}
 #' @useDynLib MSEtool
 #' @export
-SCA <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logistic", "dome"),
+SCA <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logistic", "dome"), Vmaxage = NA,
                 CAA_multiplier = 50, I_type = c("B", "VB", "SSB"), rescale = "mean1",
                 start = NULL, fix_h = FALSE, fix_U_equilibrium = TRUE, fix_sigma = FALSE, fix_tau = TRUE,
                 early_dev = c("comp_onegen", "comp", "all"), late_dev = "comp50", integrate = FALSE,
@@ -248,6 +248,12 @@ SCA <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logistic
     }
     if(vulnerability == "dome") {
       params$vul_par <- c(log(1), CAA_mode, log(0.5), log(5)) # double normal: logsd(ascending), mean(asc), mean(desc)-logoffset, sd(desc)
+      if(is.na(Vmaxage)) {
+        params$vul_par <- c(params$vul_par, logit(0.01))
+      } else {
+        if(Vmaxage < 0.01) Vmaxage <- 0.01
+        params$vul_par <- c(params$vul_par, logit(Vmaxage))
+      }
     }
   }
   if(is.null(params$log_sigma)) {
@@ -265,6 +271,7 @@ SCA <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logistic
                inner.control = inner.control, rescale = rescale)
 
   map <- list()
+  if(vulnerability == "dome" && !is.na(Vmaxage)) map$vul_par <- factor(c(1:4, NA))
   if(fix_h) map$transformed_h <- factor(NA)
   if(fix_U_equilibrium) map$U_equilibrium <- factor(NA)
   if(fix_sigma) map$log_sigma <- factor(NA)
