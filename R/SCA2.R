@@ -42,7 +42,7 @@ SCA2 <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logisti
   t0 <- Data@vbt0[x]
   La <- Linf * (1 - exp(-K * (c(1:max_age) - t0)))
   Wa <- a * La ^ b
-  A0 <- min(0.5 * max_age, iVB(t0, K, Linf, Data@L50[x]))
+  A50 <- min(0.5 * max_age, iVB(t0, K, Linf, Data@L50[x]))
   A95 <- max(A50+0.5, iVB(t0, K, Linf, Data@L95[x]))
   mat_age <- 1/(1 + exp(-log(19) * (c(1:max_age) - A50)/(A95 - A50)))
   LH <- list(LAA = La, WAA = Wa, Linf = Linf, K = K, t0 = t0, a = a, b = b, A50 = A50, A95 = A95)
@@ -67,8 +67,8 @@ SCA2 <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logisti
   if(is.null(params$log_meanR)) params$log_meanR <- log(mean(C_hist * rescale)) + 2
   if(is.null(params$U_equilibrium)) params$U_equilibrium <- 0
   if(is.null(params$vul_par)) {
-    if((is.na(Data@LFC[x]) && is.na(Data@LFS[x])) || (Data@LFS[x] > Linf)) {
-      CAA_mode <- which.max(colSums(CAA_hist, na.rm = TRUE))
+    CAA_mode <- which.max(colSums(CAA_hist, na.rm = TRUE))
+    if((is.na(Data@LFC[x]) && is.na(Data@LFS[x])) || (Data@LFC[x] > Linf) || (Data@LFS[x] > Linf)) {
       if(vulnerability == "logistic") {
         params$vul_par <- c(CAA_mode-1, log(1))
       }
@@ -76,15 +76,16 @@ SCA2 <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logisti
         params$vul_par <- c(CAA_mode-1, log(1), log(1), ilogit(0.5))
       }
     } else {
-      A5 <- iVB(t0, K, Linf, Data@LFC[x])
-      A95 <- max(A5 + 0.05, iVB(t0, K, Linf, Data@LFS[x]) - 1)
-      A50 <- mean(c(A5, A95))
+      A5 <- min(iVB(t0, K, Linf, Data@LFC[x]), CAA_mode-1)
+      Afull <- min(iVB(t0, K, Linf, Data@LFS[x]), 0.5 * max_age)
+      A5 <- min(A5, Afull - 0.5)
+      A50_vul <- mean(c(A5, Afull))
 
       if(vulnerability == "logistic") {
-        params$vul_par <- c(A50, log(A95 - A50))
+        params$vul_par <- c(A50_vul, log(Afull - A50_vul))
       }
       if(vulnerability == "dome") {
-        params$vul_par <- c(A50, log(A95+1 - A50), log(1), ilogit(0.5))
+        params$vul_par <- c(A50_vul, log(A95+1 - A50_vul), log(1), ilogit(0.5))
       }
     }
   }
