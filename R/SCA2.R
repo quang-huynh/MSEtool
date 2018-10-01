@@ -5,7 +5,7 @@
 #' @export
 SCA2 <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logistic", "dome"),
                  CAA_dist = c("multinomial", "lognormal"), CAA_multiplier = 50, I_type = c("B", "VB", "SSB"), rescale = "mean1",
-                 start = NULL, fix_h = FALSE, fix_U_equilibrium = TRUE, fix_sigma = FALSE, fix_tau = TRUE,
+                 start = NULL, fix_h = TRUE, fix_U_equilibrium = TRUE, fix_sigma = FALSE, fix_tau = TRUE,
                  common_dev = "comp50", integrate = FALSE, silent = TRUE, opt_hess = FALSE, n_restart = ifelse(opt_hess, 0, 1),
                  control = list(iter.max = 2e5, eval.max = 4e5), inner.control = list(),  ...) {
   dependencies <- "Data@Cat, Data@Ind, Data@Mort, Data@L50, Data@L95, Data@CAA, Data@vbK, Data@vbLinf, Data@vbt0, Data@wla, Data@wlb, Data@MaxAge"
@@ -143,7 +143,8 @@ SCA2 <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logisti
                    map = map, random = random, DLL = "MSEtool", inner.control = inner.control, silent = silent)
 
   # Add starting values for rec-devs and increase R0 start value if too low
-  if(obj$report(c(obj$par, obj$env$last.par[obj$env$random]))$penalty > 0) {
+  high_U <- try(obj$report(c(obj$par, obj$env$last.par[obj$env$random]))$penalty > 0, silent = TRUE)
+  if(!is.character(high_U) && high_U) {
     Recruit <- try(Data@Rec[x, ], silent = TRUE)
     if(is.numeric(Recruit) && length(Recruit) == n_y && any(!is.na(Recruit))) {
       log_rec_dev <- log(Recruit/mean(Recruit, na.rm = TRUE))
@@ -153,10 +154,9 @@ SCA2 <- function(x = 1, Data, SR = c("BH", "Ricker"), vulnerability = c("logisti
       obj <- MakeADFun(data = info$data, parameters = info$params, hessian = TRUE,
                        map = map, random = random, DLL = "MSEtool", inner.control = inner.control, silent = silent)
     }
-    while(obj$report(c(obj$par, obj$env$last.par[obj$env$random]))$penalty > 0) {
+    while(obj$par["log_meanR"] < 30 && obj$report(c(obj$par, obj$env$last.par[obj$env$random]))$penalty > 0) {
       obj$par["log_meanR"] <- obj$par["log_meanR"] + 1
     }
-    obj$par["log_meanR"] <- obj$par["log_meanR"] + 1
   }
 
   mod <- optimize_TMB_model(obj, control, opt_hess, n_restart)

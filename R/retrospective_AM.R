@@ -36,24 +36,20 @@ retrospective_AM <- function(MSE, sim = 1, MP, MSE_Hist = NULL, plot_legend = FA
 
   if(!inherits(MSE, "MSE")) stop("No object of class MSE was provided.")
   if(length(MSE@Misc) == 0) stop("Nothing found in MSE@Misc. Use an MP created by 'make_MP(diagnostic = 'full')' and set 'runMSE(PPD = TRUE)'.")
+  if(length(sim) > 1 || sim > MSE@nsim) stop(paste0(sim, " should be a number between 1 and ", MSE@nsim, "."))
 
   MPs <- MSE@MPs
-  has_diagnostic_fn <- function(x) {
-    Misc <- x@Misc
-    all(vapply(Misc, function(y) any(names(y) == "diagnostic"), logical(1)))
-  }
-  has_diagnostic <- vapply(MSE@Misc, has_diagnostic_fn, logical(1))
-  if(all(!has_diagnostic)) stop("No diagnostic information found in MSE@Misc for any MP. Use an MP created by 'make_MP(diagnostic = 'min')' and set 'runMSE(PPD = TRUE)'.")
-  MPs <- MPs[has_diagnostic]
-
-  match_ind <- pmatch(MP, MPs)
+  match_ind <- match(MP, MPs)
   if(is.na(match_ind)) stop(paste(MP, "MP was not found in the MSE object. Available options are:", paste(MPs, collapse = " ")))
-  MPs <- MPs[match_ind]
-  MPind <- MSE@MPs == MP
-  if(sum(MPind) > 1) stop(paste("More than one match to", MP, "was found in MSE object."))
 
-  if(length(sim) > 1 || sim > MSE@nsim) stop(paste0(sim, " should be a number between 1 and ", MSE@nsim, "."))
-  Assessment_report <- lapply(MSE@Misc[[which(MPind)]]@Misc, getElement, "Assessment_report")[[sim]]
+  has_Assess_fn <- function(Data) {
+    Misc <- Data@Misc
+    all(vapply(Misc, function(y) any(names(y) == "Assessment_report"), logical(1)))
+  }
+  has_Assess <- has_Assess_fn(MSE@Misc[[match_ind]])
+  if(!has_Assess) stop("No Assessment objects were found in MSE@Misc for any MP. Use an MP created by 'make_MP(diagnostic = 'full')' and set 'runMSE(PPD = TRUE)'.")
+
+  Assessment_report <- lapply(MSE@Misc[[match_ind]]@Misc, getElement, "Assessment_report")[[sim]]
 
   isSP <- grepl("SP", Assessment_report[[1]]@Model)
 
@@ -68,7 +64,7 @@ retrospective_AM <- function(MSE, sim = 1, MP, MSE_Hist = NULL, plot_legend = FA
   for(i in 1:length(plot_type)) {
     if(plot_type[i] == "SSB_SSBMSY") {
       Hist <- apply(MSE@SSB_hist, c(1, 3), sum)[sim, ]/MSE@OM$SSBMSY[sim]
-      Proj <- MSE@B_BMSY[sim, MPind, ]
+      Proj <- MSE@B_BMSY[sim, match_ind, ]
       if(!isSP) {
         Assess <- lapply(Assessment_report, slot, "SSB_SSBMSY")
       } else {
@@ -77,7 +73,7 @@ retrospective_AM <- function(MSE, sim = 1, MP, MSE_Hist = NULL, plot_legend = FA
     }
     if(plot_type[i] == "F_FMSY") {
       Hist <- apply(MSE@FM_hist, c(1, 3), max)[sim, ]/MSE@OM$FMSY[sim]
-      Proj <- MSE@F_FMSY[sim, MPind, ]
+      Proj <- MSE@F_FMSY[sim, match_ind, ]
       Assess <- lapply(Assessment_report, slot, "F_FMSY")
       if(length(do.call(c, Assess)) == 0) {
         AssessU <- lapply(Assessment_report, slot, "U")
@@ -87,7 +83,7 @@ retrospective_AM <- function(MSE, sim = 1, MP, MSE_Hist = NULL, plot_legend = FA
     }
     if(plot_type[i] == "SSB") {
       Hist <- apply(MSE@SSB_hist, c(1, 3), sum)[sim, ]
-      Proj <- MSE@SSB[sim, MPind, ]
+      Proj <- MSE@SSB[sim, match_ind, ]
       if(!isSP) {
         Assess <- lapply(Assessment_report, slot, "SSB")
       } else {
@@ -96,7 +92,7 @@ retrospective_AM <- function(MSE, sim = 1, MP, MSE_Hist = NULL, plot_legend = FA
     }
     if(plot_type[i] == "F") {
       Hist <- apply(MSE@FM_hist, c(1, 3), max)[sim, ]
-      Proj <- MSE@FM[sim, MPind, ]
+      Proj <- MSE@FM[sim, match_ind, ]
       Assess <- lapply(Assessment_report, slot, "FMort")
       if(length(do.call(c, Assess)) == 0) {
         AssessU <- lapply(Assessment_report, slot, "U")
@@ -105,7 +101,7 @@ retrospective_AM <- function(MSE, sim = 1, MP, MSE_Hist = NULL, plot_legend = FA
     }
     if(plot_type[i] == "SSB_SSB0") {
       Hist <- apply(MSE@SSB_hist, c(1, 3), sum)[sim, ]/MSE@OM$SSB0[sim]
-      Proj <- MSE@SSB[sim, MPind, ]/MSE@OM$SSB0[sim]
+      Proj <- MSE@SSB[sim, match_ind, ]/MSE@OM$SSB0[sim]
       if(!isSP) {
         Assess <- lapply(Assessment_report, slot, "SSB_SSB0")
       } else {
@@ -119,7 +115,7 @@ retrospective_AM <- function(MSE, sim = 1, MP, MSE_Hist = NULL, plot_legend = FA
         Hist <- rep(NA, MSE@nyears)
         message("Provide Hist object in order to plot the historical vulnerable biomass in the operating model.")
       }
-      Proj <- MSE@VB[sim, MPind, ]
+      Proj <- MSE@VB[sim, match_ind, ]
       Assess <- lapply(Assessment_report, slot, "VB")
     }
 
